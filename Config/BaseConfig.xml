@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Config>
+  <Cookie>
+  </Cookie>
+  <Settings>
+    <!--manual为使用非登录方法，直接通过读取RoomList.xml获取信息，auto为使用需要cookie的api读取关注列表-->
+    <LoadMethod>manual</LoadMethod>
+    <AutoRefresh>false</AutoRefresh>
+    <RefreshTime format="second">10</RefreshTime>
+    <AutoOpen>false</AutoOpen>
+  </Settings>
+  
+</Config>
