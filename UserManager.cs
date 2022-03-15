@@ -172,6 +172,7 @@ namespace LiveBot
             }
             catch
             {
+                new LiveToast().ToastText("网络连接好像有问题");
                 return;
             }
         }
@@ -367,15 +368,20 @@ namespace LiveBot
         /// <returns></returns>
         public bool Expired()
         {
-            if (!HasCookie())
+            try
             {
+                if (!HasCookie())
+                {
+                    return false;
+                }
+                if (Utilities.ConvertJsonString(Utilities.HttpGet("http://api.bilibili.com/x/web-interface/nav", "", "cookie:SESSDATA=" + LoginInfo["SESSDATA"]))["data"]["isLogin"].ToString() == "False")
+                {
+                    return true;
+                }
                 return false;
             }
-            if (Utilities.ConvertJsonString(Utilities.HttpGet("http://api.bilibili.com/x/web-interface/nav", "", "cookie:SESSDATA=" + LoginInfo["SESSDATA"]))["data"]["isLogin"].ToString() == "False")
-            {
-                return true;
-            }
-            return false;
+            catch { return false; }
+            
         }
 
         //Discard Function

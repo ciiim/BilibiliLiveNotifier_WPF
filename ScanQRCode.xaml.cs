@@ -32,14 +32,18 @@ namespace LiveBot
                 new LiveToast().ToastText("你已经登陆过了哦");
                 Close();
             }
-            Newtonsoft.Json.Linq.JObject data = Utilities.ConvertJsonString(Utilities.HttpGet("http://passport.bilibili.com/qrcode/getLoginUrl"));
-            QrCode.Source = Utilities.Qrencode(data["data"]["url"].ToString());
-            authKey = data["data"]["oauthKey"].ToString();
-            listen = new Timer();
-            listen.Elapsed += WaitLogin;
-            listen.AutoReset = true;
-            listen.Interval = 500;
-            listen.Start();
+            try
+            {
+                Newtonsoft.Json.Linq.JObject data = Utilities.ConvertJsonString(Utilities.HttpGet("http://passport.bilibili.com/qrcode/getLoginUrl"));
+                QrCode.Source = Utilities.Qrencode(data["data"]["url"].ToString());
+                authKey = data["data"]["oauthKey"].ToString();
+                listen = new Timer();
+                listen.Elapsed += WaitLogin;
+                listen.AutoReset = true;
+                listen.Interval = 500;
+                listen.Start();
+            }
+            catch { new LiveToast().ToastText("获取二维码失败"); }
         }
 
         private void WaitLogin(object sender, ElapsedEventArgs e)
