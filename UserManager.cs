@@ -1,12 +1,12 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Controls;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Controls;
 using System.Xml;
-using Newtonsoft.Json;
-using System.Collections.Concurrent;
 
 namespace LiveBot
 {
@@ -77,7 +77,6 @@ namespace LiveBot
         {
             public ManualResetEvent e;
             public string number;
-
             public ForQuery(string id, ManualResetEvent manual)
             {
                 number = id;
@@ -91,68 +90,73 @@ namespace LiveBot
         private static UserManager instance;
         public Dictionary<string, string> LoginInfo { get; set; }
         public ConcurrentBag<UserInfo> UserInfoList { get; private set; }
-        public static UserManager Instance
+        public static UserManager Instance//UserManager单例模式
         {
             get
             {
                 if (instance == null) { instance = new UserManager(); return instance; } else { return instance; }
             }
         }
+        private int retryCounts;
+        private bool isSuccess = true;
         public static string RoomPath { get; } = @".\Config\RoomList.xml";
         public static string BaseConfigPath { get; } = @".\Config\BaseConfig.xml";
+        public static string UA { get; } = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.57";
         #region 登录方法
 
-        public void ReloadUserInfo()
+        public bool ReloadUserInfo()
         {
             string load = BaseConfigXml.GetChildText("Config/Settings", "LoadMethod");
             if (load == "manual")
             {
-                NoLogin_ReloadUserInfo();
+                return NoLogin_ReloadUserInfo();
             }
             else if (load == "auto")
             {
-                Login_ReloadUserInfo();
+                return Login_ReloadUserInfo();
             }
-            else
-            {
-                return;
-            }
-            return;
+            return false;
         }
         #region 没有登录的方法
-        private void NoLogin_ReloadUserInfo()
+        private bool NoLogin_ReloadUserInfo()
         {
             ClearUserInfo();
             RoomInfoXml.Load();
             List<string> roomList = RoomInfoXml.GetAllChildAttr("RoomRoot", "Room", "roomid");//从xml文件内读取房间
             roomEvents = new ManualResetEvent[roomList.Count];
             int i = 0;
+
+            void queryUserinfo(object f)
+            {
+                QueryMutiThread(f);
+            }
             foreach (string roomid in roomList)
             {
                 roomEvents[i] = new ManualResetEvent(false);
                 ForQuery f = new ForQuery(roomid, roomEvents[i]);
-                ThreadPool.QueueUserWorkItem(new WaitCallback(QueryMutiThread), f);
+                ThreadPool.QueueUserWorkItem(queryUserinfo, f);
                 i++;
             }
-            return;
+            return isSuccess;
+            
         }
         #endregion
         #region 已登录的方法
-        private void Login_ReloadUserInfo()
+        private bool Login_ReloadUserInfo()
         {
             if (Expired())
             {
                 SaveSetting("Config", "Cookie", "");
                 SaveSetting("Config", "ExpiredTime", "");
                 new LiveToast().ToastText("登录过期 请重新登录");
-                return;
+                return true;
             }
             ClearUserInfo();
             //通过api获取用户关注列表
             if (!HasCookie())
             {
                 new LiveToast().ToastText("未登录~ 获取列表失败");
-                return;
+                return true;
             }
             try
             {
@@ -162,18 +166,24 @@ namespace LiveBot
                 Newtonsoft.Json.Linq.JObject json = Utilities.ConvertJsonString(res);
                 int totalPage = int.Parse(json["data"]["totalPage"].ToString());
                 roomEvents = new ManualResetEvent[totalPage];
+                isSuccess = true;
+
+                void queryUserinfo(object f)
+                {
+                    QueryPageMutiThread(f);
+                }
                 for (int i = 0; i < totalPage; i++)
                 {
                     roomEvents[i] = new ManualResetEvent(false);
                     ForQuery f = new ForQuery((i + 1).ToString(), roomEvents[i]);
-                    ThreadPool.QueueUserWorkItem(new WaitCallback(QueryPageMutiThread), f);
+                    ThreadPool.QueueUserWorkItem(queryUserinfo, f);
                 }
-                return;
+                return isSuccess;
             }
             catch
             {
-                new LiveToast().ToastText("网络连接好像有问题");
-                return;
+                new LiveToast().ToastText("获取关注列表时出错");
+                return false;
             }
         }
         #endregion
@@ -235,7 +245,9 @@ namespace LiveBot
             return;*/
 
             List<UserInfo> oldList = UserInfoList.ToList();
+            retryCounts = 0;
             ReloadUserInfo();
+
             Task task = new Task(new Action(() =>
             {
                 if (roomEvents == null || roomEvents.Length == 0)
@@ -247,7 +259,17 @@ namespace LiveBot
                     return;
                 }
                 WaitHandle.WaitAll(roomEvents);
-                Thread.Sleep(500);
+                while ((!isSuccess) && retryCounts <= 3) 
+                {
+                    ReloadUserInfo();
+                    WaitHandle.WaitAll(roomEvents);
+                    retryCounts++;
+                }
+                Thread.Sleep(300);
+                if(retryCounts > 3)
+                {
+                    new LiveToast().ToastText("网络错误");
+                }
 
                 List<UserInfo> existenceList = UserInfoList.Except(oldList).ToList();
                 List<UserInfo> nowStreamingRoom = new List<UserInfo>();
@@ -266,7 +288,7 @@ namespace LiveBot
         #endregion
 
         #region 查询方法
-        private static void QueryMutiThread(object obj)
+        private static bool QueryMutiThread(object obj)
         {
 
             UserInfo room;
@@ -276,27 +298,33 @@ namespace LiveBot
                 string uid;
                 string res;
                 Thread.Sleep(10);
-                res = Utilities.HttpGet("https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo", "room_id=" + f.number);
+                res = Utilities.HttpGet("https://api.live.bilibili.com/room/v1/Room/get_info", "room_id=" + f.number);
+                Newtonsoft.Json.Linq.JObject userData = (Newtonsoft.Json.Linq.JObject)JsonConvert.DeserializeObject(res);
                 if (Utilities.ConvertJsonString(res)["data"].ToString() == "")
                 {
                     room = new UserInfo(_uid: "", _userName: "房间不存在", _roomid: f.number, _title: "", _liveState: "");
                     Instance.UserInfoList.Add(room);
-                    throw new Exception();
+                    throw new Exception("房间不存在");
                 }
                 uid = ((Newtonsoft.Json.Linq.JObject)JsonConvert.DeserializeObject(res))["data"]["uid"].ToString();
-                res = Utilities.HttpGet("https://api.bilibili.com/x/space/acc/info", "mid=" + uid + "&jsonp=jsonp");
-                Newtonsoft.Json.Linq.JObject userData = (Newtonsoft.Json.Linq.JObject)JsonConvert.DeserializeObject(res);
-                string liveState = userData["data"]["live_room"]["liveStatus"].ToString() == "1" ? "直播中" : "未开播";
-                string liveTitle = userData["data"]["live_room"]["title"].ToString();
-                string userName = userData["data"]["name"].ToString();
+                string liveState = userData["data"]["live_status"].ToString() == "1" ? "直播中" : "未开播";
+                string liveTitle = userData["data"]["title"].ToString();
+                string userName = "错误";
+                res = Utilities.HttpGet("https://api.bilibili.com/x/space/acc/info", "mid=" + uid);
+                userData = (Newtonsoft.Json.Linq.JObject)JsonConvert.DeserializeObject(res);
+                if (userData["code"].ToString() == "0")
+                {
+                    userName = ((Newtonsoft.Json.Linq.JObject)JsonConvert.DeserializeObject(res))["data"]["name"].ToString();
+                }
                 room = new UserInfo(_uid: uid, _userName: userName, _roomid: f.number, _title: liveTitle, _liveState: liveState);
                 Instance.UserInfoList.Add(room);
+                return true;
             }
-            catch { }
+            catch(Exception e) { new LiveToast().ToastText(e.Message); Instance.isSuccess = false; return false; }
             finally { f.e.Set(); }
         }
 
-        private static void QueryPageMutiThread(object obj)
+        private static bool QueryPageMutiThread(object obj)
         {
             UserManager userManager = Instance;
             ForQuery f = (ForQuery)obj;
@@ -311,8 +339,9 @@ namespace LiveBot
                 {
                     userManager.UserInfoList.Add(new UserInfo(user["uid"].ToString(), user["uname"].ToString(), user["roomid"].ToString(), user["title"].ToString(), user["live_status"].ToString() == "1" ? "直播中" : "未开播"));
                 }
+                return true;
             }
-            catch { }
+            catch { Instance.isSuccess = false; return false; }
             finally { f.e.Set(); }
 
         }
@@ -346,6 +375,7 @@ namespace LiveBot
 
         private void ClearUserInfo()
         {
+            if(UserInfoList != null)
             UserInfoList = new ConcurrentBag<UserInfo>();
         }
 
@@ -381,7 +411,7 @@ namespace LiveBot
                 return false;
             }
             catch { return false; }
-            
+
         }
 
         //Discard Function

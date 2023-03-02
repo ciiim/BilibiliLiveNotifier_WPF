@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Toolkit.Uwp.Notifications;
-using Newtonsoft.Json;
-using System.Net;
-using System.IO;
+﻿using Microsoft.Toolkit.Uwp.Notifications;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Text;
 
 namespace LiveBot
 {
@@ -65,7 +59,7 @@ namespace LiveBot
         {
             ConcurrentBag<UserManager.UserInfo> roomToastList = UserManager.Instance.UserInfoList;
             int streamingCount = 0;
-            foreach (UserManager.UserInfo info in UserManager.Instance.UserInfoList)
+            foreach (UserManager.UserInfo info in roomToastList)
             {
                 if (info.LiveState == "直播中")
                     streamingCount++;

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Windows;
 using System.Timers;
+using System.Windows;
 
 namespace LiveBot
 {
@@ -50,7 +50,7 @@ namespace LiveBot
         {
             Dictionary<string, string> postData = new Dictionary<string, string>();
             postData.Add("oauthKey", authKey);
-            Newtonsoft.Json.Linq.JObject res = Utilities.ConvertJsonString(Utilities.HttpPost("http://passport.bilibili.com/qrcode/getLoginInfo", postData,  new Dictionary<string, string>()));
+            Newtonsoft.Json.Linq.JObject res = Utilities.ConvertJsonString(Utilities.HttpPost("http://passport.bilibili.com/qrcode/getLoginInfo", postData, new Dictionary<string, string>()));
             if (res["status"].ToString() == "True")
             {
                 SaveLoginInfo(res);

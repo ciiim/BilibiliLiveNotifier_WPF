@@ -1,9 +1,9 @@
 ﻿using System;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Text.RegularExpressions;
 using System.Windows.Input;
 
 namespace LiveBot
@@ -151,7 +151,7 @@ namespace LiveBot
 
         private void AddSubmitButton(object sender, RoutedEventArgs e)
         {
-            
+
             if (newRoomid.Text == "")
             {
                 AddGrid.Visibility = Visibility.Hidden;

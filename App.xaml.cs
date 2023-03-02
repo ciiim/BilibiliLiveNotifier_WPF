@@ -1,18 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Data;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Microsoft.Toolkit.Uwp.Notifications;
 using System.Windows;
-using Microsoft.Toolkit.Uwp.Notifications;
-using System.Net;
-using System.IO;
-using System.Text;
-using System.Xml;
-using System.Diagnostics;
-using System.Windows.Controls;
-using System.Threading;
 
 namespace LiveBot
 {

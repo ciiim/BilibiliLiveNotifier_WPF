@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 
@@ -41,6 +38,7 @@ namespace LiveBot
             HttpWebRequest request = WebRequest.Create(finalUrl) as HttpWebRequest;
             request.Method = "GET";
             request.ContentType = "application/json";
+            request.UserAgent = UserManager.UA;
             #region Header
             foreach (KeyValuePair<string, string> item in HeadersToDic(headers))
             {
@@ -48,7 +46,10 @@ namespace LiveBot
             }
             #endregion
             HttpWebResponse response = request.GetResponse() as HttpWebResponse;
-
+            if(response.StatusCode != HttpStatusCode.OK)
+            {
+                return "ERROR";
+            }
             Stream myResponseStream = response.GetResponseStream();
             StreamReader myStreamReader = new StreamReader(myResponseStream, Encoding.GetEncoding("utf-8"));
             string retString = myStreamReader.ReadToEnd();
